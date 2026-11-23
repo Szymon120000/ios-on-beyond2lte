@@ -1,0 +1,363 @@
+diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
+index 9a748ea..85e90c9 100644
+--- a/makedefs/MakeInc.def
++++ b/makedefs/MakeInc.def
+@@ -62,6 +62,9 @@ MACHINE_FLAGS_ARM64_T6000 = -DARM64_BOARD_CONFIG_T6000 		-mcpu=apple-a14
+ MACHINE_FLAGS_ARM64_VMAPPLE = -DARM64_BOARD_CONFIG_VMAPPLE              -march=armv8.5a
+ MACHINE_FLAGS_ARM64_BCM2837 = -DARM64_BOARD_CONFIG_BCM2837
+ MACHINE_FLAGS_ARM64_SWEET = -DARM64_BOARD_CONFIG_SWEET                -march=armv8.2-a+crypto
++ifeq ($(B2L_BOARD),1)
++MACHINE_FLAGS_ARM64_SWEET += -DB2L_BOARD=1
++endif
+ 
+ 
+ #
+diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
+index 06bb568..f399a83 100644
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -1843,7 +1843,11 @@ sweet_early_map_final(void)
+ 	tt_entry_t *l2 = (tt_entry_t *)phystokv(l1 & ARM_TTE_TABLE_MASK);
+ 	tt_entry_t *slot = &l2[(va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT];
+ 	assert(*slot == ARM_TTE_EMPTY);
++#if defined(B2L_BOARD)
++	*slot = B2L_FB_BASE | ARM_TTE_VALID | ARM_TTE_TYPE_BLOCK |
++#else
+ 	*slot = 0x9c000000ULL | ARM_TTE_VALID | ARM_TTE_TYPE_BLOCK |
++#endif
+ 	    ARM_TTE_BLOCK_SH(SH_OUTER_MEMORY) |
+ 	    ARM_TTE_BLOCK_ATTRINDX(CACHE_ATTRINDX_WRITECOMB) |
+ 	    ARM_TTE_BLOCK_AF | ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX;
+diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
+index 24f1abc..2cf120f 100644
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -35,6 +35,7 @@
+ #include <arm/machine_cpu.h>
+ #include <arm/trap.h> /* for IS_ARM_GDB_TRAP() et al */
+ #include <arm64/proc_reg.h>
++#include <pexpert/arm/b2l_gicv2.h>
+ #include <arm64/machine_machdep.h>
+ #include <arm64/monotonic.h>
+ #include <arm64/instructions.h>
+@@ -1856,7 +1857,38 @@ sleh_irq(arm_saved_state_t *state)
+ #endif
+ 
+ 
+-#if defined(SWEET)
++#if defined(B2L_BOARD)
++	uint32_t iar = b2l_gicv2_ack();
++	uint32_t intid = iar & 0x3ffU;
++
++	if (intid >= 1020) {
++		return; /* spurious */
++	}
++	if (b2l_gicv2_is_timer(intid)) {
++		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_TIMER);
++		cdp->cpu_decrementer = -1; /* Large */
++		INTERRUPT_MASKED_DEBUG_START(rtclock_intr, DBG_INTR_TYPE_TIMER);
++		rtclock_intr(TRUE);
++		INTERRUPT_MASKED_DEBUG_END();
++		b2l_gicv2_eoi(iar);
++	} else if (intid < 16) {
++		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_IPI);
++		/* Ack before handling so an IPI raised meanwhile is not lost */
++		b2l_gicv2_eoi(iar);
++		__builtin_arm_isb(ISB_SY);
++		cpu_signal_handler();
++	} else {
++		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_OTHER);
++		if (cdp->interrupt_handler) {
++			cdp->interrupt_handler(cdp->interrupt_target,
++			    cdp->interrupt_refCon,
++			    cdp->interrupt_nub,
++			    intid);
++		}
++		b2l_gicv2_eoi(iar);
++	}
++	__builtin_arm_isb(ISB_SY);
++#elif defined(SWEET)
+ 	/*
+ 	 * sweet: TrustZone owns GIC Group 0, so the timer and IPIs that other
+ 	 * ARM64 targets take as FIQs arrive here as Group 1 IRQs.
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index 023086f..e66f85c 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -515,10 +515,15 @@ LEXT(start_first_cpu)
+ 
+ #if defined(SWEET)
+ 	/* Stage 0: white 64x32 band, no stack or page tables needed. */
++#if defined(B2L_BOARD)
++	MOV64	x0, (0xCA000000 + (1440 * 3008 * 4))
++	mov		x4, #(1440 * 4)
++#else
+ 	MOV64	x0, (0x9c000000 + 2368 * 4320)
++	mov		x4, #4320
++#endif
+ 	mov		w1, #-1
+ 	mov		x2, #32
+-	mov		x4, #4320
+ Lsweet_mark_row:
+ 	mov		x3, #64
+ 	mov		x5, x0
+@@ -686,7 +691,11 @@ Lkernelcache_base_found:
+ 	 * SWEET uses 16K pages and all bring-up RAM is below 4GB, so the first
+ 	 * V=P L2 page is bootstrap_pagetables + 2*PGBYTES.
+ 	 */
++#if defined(B2L_BOARD)
++	MOV64	x10, 0xCA000000
++#else
+ 	MOV64	x10, 0x9c000000
++#endif
+ 	MOV64	x11, (ARM_TTE_TYPE_BLOCK | ARM_TTE_VALID | ARM_TTE_BLOCK_SH(SH_OUTER_MEMORY) | ARM_TTE_BLOCK_ATTRINDX(CACHE_ATTRINDX_WRITECOMB) | ARM_TTE_BLOCK_AF | ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX)
+ 	orr		x11, x11, x10
+ 	and		x12, x10, #(ARM_TT_L2_INDEX_MASK)
+diff --git a/osfmk/arm64/sweet_early.c b/osfmk/arm64/sweet_early.c
+index 6928957..2419259 100644
+--- a/osfmk/arm64/sweet_early.c
++++ b/osfmk/arm64/sweet_early.c
+@@ -11,11 +11,19 @@
+ #include <stdint.h>
+ #include <kern/misc_protos.h>
+ 
++#if defined(B2L_BOARD)
++static volatile uint32_t *early_fb = (volatile uint32_t *)(uintptr_t)B2L_FB_BASE;
++#define EARLY_FB early_fb
++#define EARLY_WIDTH B2L_FB_WIDTH
++#define EARLY_HEIGHT B2L_FB_HEIGHT
++#define EARLY_STRIDE (B2L_FB_STRIDE / 4u)
++#else
+ static volatile uint32_t *early_fb = (volatile uint32_t *)(uintptr_t)0x9c000000;
+ #define EARLY_FB early_fb
+ #define EARLY_WIDTH 1080u
+ #define EARLY_HEIGHT 2400u
+ #define EARLY_STRIDE (4320u / 4)
++#endif
+ #define EARLY_SCALE 2u
+ #define EARLY_CELL_W (8u * EARLY_SCALE)
+ #define EARLY_CELL_H (16u * EARLY_SCALE)
+diff --git a/pexpert/arm/b2l_gicv2.h b/pexpert/arm/b2l_gicv2.h
+new file mode 100644
+index 0000000..b07c877
+--- /dev/null
++++ b/pexpert/arm/b2l_gicv2.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: BSD-2-Clause
++ * Exynos 9820 (beyond2lte) GICv2 CPU-interface access used by sleh_irq().
++ * The distributor is programmed once in pe_init_fiq(); the IRQ path only
++ * acknowledges and ends interrupts through the CPU interface.
++ */
++#ifndef _PEXPERT_ARM_B2L_GICV2_H_
++#define _PEXPERT_ARM_B2L_GICV2_H_
++
++#include <stdint.h>
++
++#if defined(B2L_BOARD)
++extern uint32_t b2l_gicv2_ack(void);
++extern void b2l_gicv2_eoi(uint32_t iar);
++extern int b2l_gicv2_is_timer(uint32_t intid);
++#else
++static inline uint32_t b2l_gicv2_ack(void) { return 1023; }
++static inline void b2l_gicv2_eoi(uint32_t iar) { (void)iar; }
++static inline int b2l_gicv2_is_timer(uint32_t intid) { (void)intid; return 0; }
++#endif
++
++#endif /* ! _PEXPERT_ARM_B2L_GICV2_H_ */
+diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
+index 6089db9..428093b 100644
+--- a/pexpert/arm/pe_fiq.c
++++ b/pexpert/arm/pe_fiq.c
+@@ -13,6 +13,92 @@
+ #include <pexpert/arm64/board_config.h>
+ 
+ 
++#if defined(B2L_BOARD)
++/*
++ * beyond2lte (Exynos 9820) GICv2.  TrustZone owns Group 0, so the timer and
++ * SGIs are programmed as Group 1 and arrive as IRQs, exactly like the SWEET
++ * GICv3 path.  GICC is banked per CPU, so secondary cores only need the
++ * CPU-interface half; the distributor is programmed once by the boot CPU.
++ */
++#include <pexpert/arm/b2l_gicv2.h>
++
++#define GICD_CTLR_DISABLE       0x0
++#define GICD_CTLR_ENABLE_GRP1   0x2
++#define GICC_CTLR_DISABLE       0x0
++#define GICC_CTLR_ENABLE_GRP1   0x2
++#define GICC_PMR_ALL            0xff
++#define GIC_PRIORITY_DEFAULT    0xa0
++
++static vm_offset_t b2l_gicd_base;
++static vm_offset_t b2l_gicc_base;
++
++static inline uint32_t
++b2l_gic_read(vm_offset_t base, uint32_t offset)
++{
++	return *(volatile uint32_t *)(base + offset);
++}
++
++static inline void
++b2l_gic_write(vm_offset_t base, uint32_t offset, uint32_t value)
++{
++	*(volatile uint32_t *)(base + offset) = value;
++	__asm__ volatile("dsb sy" ::: "memory");
++}
++
++uint32_t
++b2l_gicv2_ack(void)
++{
++	return b2l_gic_read(b2l_gicc_base, GICC_IAR);
++}
++
++void
++b2l_gicv2_eoi(uint32_t iar)
++{
++	b2l_gic_write(b2l_gicc_base, GICC_EOIR, iar);
++}
++
++int
++b2l_gicv2_is_timer(uint32_t intid)
++{
++	return intid == SWEET_VTIMER_INTID;
++}
++
++void
++pe_init_fiq(void)
++{
++	if (!b2l_gicd_base) {
++		b2l_gicd_base = ml_io_map(B2L_GICD_PA, 0x1000);
++		b2l_gicc_base = ml_io_map(B2L_GICC_PA, 0x2000);
++		if (!b2l_gicd_base || !b2l_gicc_base) {
++			panic("%s: cannot map the Exynos GICv2 regions", __func__);
++		}
++
++		/* Route PPIs and the first SPIs to Group 1, CPU 0. */
++		b2l_gic_write(b2l_gicd_base, GICD_CTLR, GICD_CTLR_DISABLE);
++		for (uint32_t i = 0; i < 32; i += 4) {
++			b2l_gic_write(b2l_gicd_base, GICD_IGROUPR + i, 0xffffffffU);
++			b2l_gic_write(b2l_gicd_base, GICD_IPRIORITYR + i,
++			    GIC_PRIORITY_DEFAULT * 0x01010101U);
++			b2l_gic_write(b2l_gicd_base, GICD_ITARGETSR + i, 0x01010101U);
++		}
++		/* Virtual timer PPI 27. */
++		b2l_gic_write(b2l_gicd_base, GICD_ISENABLER + ((SWEET_VTIMER_INTID / 32) * 4),
++		    1U << (SWEET_VTIMER_INTID % 32));
++		b2l_gic_write(b2l_gicd_base, GICD_CTLR, GICD_CTLR_ENABLE_GRP1);
++	}
++
++	b2l_gic_write(b2l_gicc_base, GICC_CTLR, GICC_CTLR_DISABLE);
++	b2l_gic_write(b2l_gicc_base, GICC_PMR, GICC_PMR_ALL);
++	b2l_gic_write(b2l_gicc_base, GICC_BPR, 0);
++	b2l_gic_write(b2l_gicc_base, GICC_CTLR, GICC_CTLR_ENABLE_GRP1);
++	__asm__ volatile("isb sy" ::: "memory");
++
++	kprintf("B2L GIC: GICv2 timer PPI %u, counter %u Hz\n",
++	    (unsigned)SWEET_VTIMER_INTID, (unsigned)B2L_COUNTER_HZ);
++}
++
++#else /* !B2L_BOARD */
++
+ #if HAS_GIC_V3
+ #define GICR_WAKE_TIMEOUT_NS (1000000000ULL) // timeout for redistributor wakeup (default 1s)
+ MACHINE_TIMEOUT(gicr_wake_timeout_ns, "gicr-wake-timeout", GICR_WAKE_TIMEOUT_NS, MACHINE_TIMEOUT_UNIT_NSEC, NULL);
+@@ -228,3 +314,5 @@ pe_init_fiq()
+ {
+ }
+ #endif
++
++#endif /* !B2L_BOARD */
+diff --git a/pexpert/pexpert/arm64/SWEET.h b/pexpert/pexpert/arm64/SWEET.h
+index b99c2f4..a4acb43 100644
+--- a/pexpert/pexpert/arm64/SWEET.h
++++ b/pexpert/pexpert/arm64/SWEET.h
+@@ -1,12 +1,13 @@
+ /*
+- * Board config for the Redmi Note 10 Pro ("sweet", Qualcomm SM7150 /
+- * Snapdragon 732G): Kryo 470 = Cortex-A76 + Cortex-A55, ARMv8.2, no PAC.
++ * Generic non-Apple ARM64 board config used by the hackios bring-up ports.
+  *
+- * Generic ARM like BCM2837 (no APPLE_ARM64_ARCH_FAMILY: none of Apple's
+- * implementation-defined system registers exist), 16K pages and GICv3 like
+- * VMAPPLE. Unlike VMAPPLE the GIC has two security states (GICD_TYPER
+- * SecurityExtn=1): Group 0 belongs to TrustZone, so every interrupt,
+- * including the timer, is a Group 1 IRQ taken through sleh_irq().
++ * The machine config keeps the historical SWEET name so the upstream patch
++ * series (HFS, libpthread, AMFI providers) applies unchanged.  A build may
++ * select a concrete board with -DB2L_BOARD=1: Samsung Galaxy S10+
++ * (beyond2lte, Exynos 9820), GICv2, 4KB-capable but currently 16K pages,
++ * architected virtual timer INTID 27, 26MHz counter.
++ *
++ * The default SWEET board is the Redmi Note 10 Pro (SM7150, GICv3, INTID 19).
+  */
+ 
+ #ifndef _PEXPERT_ARM64_SWEET_H
+@@ -34,14 +35,43 @@
+ #define __ARM_ENABLE_SWAP__       1
+ #define __ARM_V8_CRYPTO_EXTENSIONS__ 1
+ #define __ARM_PAN_AVAILABLE__     1
+-#define __ARM_16K_PG__            1
+ 
++#if !defined(B2L_BOARD)
++#define __ARM_16K_PG__            1
+ #define HAS_GIC_V3                1
++#endif
+ 
+ #ifndef ASSEMBLER
+ #define PLATFORM_PANIC_LOG_DISABLED
+ #endif /* ! ASSEMBLER */
+ 
++#if defined(B2L_BOARD)
++/* Exynos 9820 wires the architected virtual timer to the architectural PPI 27. */
++#define B2L_TIMER_INTID           27
++#define B2L_GICD_PA               0x10101000ULL
++#define B2L_GICC_PA               0x10102000ULL
++#define B2L_COUNTER_HZ            26000000ULL
++#define B2L_FB_BASE               0xCA000000ULL
++#define B2L_FB_WIDTH              1440U
++#define B2L_FB_HEIGHT              3040U
++#define B2L_FB_STRIDE             (B2L_FB_WIDTH * 4U)
++#define SWEET_VTIMER_INTID        B2L_TIMER_INTID
++#define SWEET_IPI_SGI             9       // SGI used for cross-CPU signals
++#define GIC_SPURIOUS_IRQ          1023
++/* GICv2 distributor / CPU interface registers (Arm IHI 0048B) */
++#define GICD_CTLR                 0x000
++#define GICD_CTLR_ENABLEGRP1      0x2
++#define GICD_IGROUPR              0x080
++#define GICD_ISENABLER            0x100
++#define GICD_IPRIORITYR           0x400
++#define GICD_ITARGETSR            0x800
++#define GICC_CTLR                 0x000
++#define GICC_CTLR_ENABLEGRP1      0x2
++#define GICC_PMR                  0x004
++#define GICC_BPR                  0x008
++#define GICC_IAR                  0x00C
++#define GICC_EOIR                 0x010
++#else
+ /*
+  * Qualcomm numbers the architected timer PPIs 1/2/3/0 (secure phys, phys,
+  * virt, hyp) instead of the usual 13/14/11/10: the virtual timer XNU uses
+@@ -49,6 +79,7 @@
+  */
+ #define SWEET_VTIMER_INTID        19
+ #define SWEET_IPI_SGI             1       // SGI used for cross-CPU signals
++#endif
+ 
+ #define GIC_SPURIOUS_IRQ          1023    // IRQ no. for GIC spurious interrupt
+ 
+diff --git a/pexpert/pexpert/arm64/board_config.h b/pexpert/pexpert/arm64/board_config.h
+index 88e524a..3a8749b 100644
+--- a/pexpert/pexpert/arm64/board_config.h
++++ b/pexpert/pexpert/arm64/board_config.h
+@@ -102,7 +102,11 @@
+ 
+ #define MAX_L2_CLINE                   6
+ #define MAX_CPUS                       8
++#if defined(B2L_BOARD)
++#define MAX_CPU_CLUSTERS               3 /* 4x A55, 2x A75, 2x M4 */
++#else
+ #define MAX_CPU_CLUSTERS               1
++#endif
+ 
+ #define CORE_NCTRS                     8 /* Placeholder; KPC is not enabled for this target */
+ 
