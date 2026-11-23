@@ -15,6 +15,9 @@ on:
       b2l_board:
         description: Select the Exynos 9820 board layer
         default: "1"
+      runner:
+        description: Runner label (macos-14 is no longer scheduled for this repo)
+        default: macos-15-intel
   push:
     branches: [main]
     paths:
@@ -55,7 +58,7 @@ jobs:
   kernel:
     name: Build XNU 8796 with B2L board layer
     needs: contract
-    runs-on: macos-14
+    runs-on: ${{ inputs.runner || 'macos-15-intel' }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +81,15 @@ jobs:
           printf '#!/bin/sh\nexit 0\n' | sudo tee /usr/local/bin/xcodes >/dev/null
           sudo chmod +x /usr/local/bin/xcodes
           sw_vers
-          XC=$(ls -d /Applications/Xcode_*.app | sort -V | head -1)
+          ls -d /Applications/Xcode*.app || true
+          # xnu-8796 needs the Xcode 15 iig (Xcode 16 emits IORPC.kernelContent).
+          # Prefer an installed 15.x; otherwise use the newest and let the build
+          # report the incompatibility instead of failing before compilation.
+          XC=$(ls -d /Applications/Xcode_15*.app 2>/dev/null | sort -V | head -1)
+          if [ -z "$XC" ]; then
+            XC=$(ls -d /Applications/Xcode*.app | sort -V | head -1)
+            echo "::warning::no Xcode 15.x installed; xnu-8796 iig may be incompatible"
+          fi
           echo "DEVELOPER_DIR=$XC/Contents/Developer" >> "$GITHUB_ENV"
           sudo xcode-select -s "$XC"
           xcodebuild -version
