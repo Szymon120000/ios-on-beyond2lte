@@ -268,7 +268,7 @@ index 6089db9..428093b 100644
 +
 +#endif /* !B2L_BOARD */
 diff --git a/pexpert/pexpert/arm64/SWEET.h b/pexpert/pexpert/arm64/SWEET.h
-index b99c2f4..a4acb43 100644
+index b99c2f4..e7fd7c3 100644
 --- a/pexpert/pexpert/arm64/SWEET.h
 +++ b/pexpert/pexpert/arm64/SWEET.h
 @@ -1,12 +1,13 @@
@@ -292,14 +292,14 @@ index b99c2f4..a4acb43 100644
   */
  
  #ifndef _PEXPERT_ARM64_SWEET_H
-@@ -34,14 +35,43 @@
+@@ -34,14 +35,44 @@
  #define __ARM_ENABLE_SWAP__       1
  #define __ARM_V8_CRYPTO_EXTENSIONS__ 1
  #define __ARM_PAN_AVAILABLE__     1
--#define __ARM_16K_PG__            1
++
+ #define __ARM_16K_PG__            1
  
 +#if !defined(B2L_BOARD)
-+#define __ARM_16K_PG__            1
  #define HAS_GIC_V3                1
 +#endif
  
@@ -337,7 +337,7 @@ index b99c2f4..a4acb43 100644
  /*
   * Qualcomm numbers the architected timer PPIs 1/2/3/0 (secure phys, phys,
   * virt, hyp) instead of the usual 13/14/11/10: the virtual timer XNU uses
-@@ -49,6 +79,7 @@
+@@ -49,6 +80,7 @@
   */
  #define SWEET_VTIMER_INTID        19
  #define SWEET_IPI_SGI             1       // SGI used for cross-CPU signals

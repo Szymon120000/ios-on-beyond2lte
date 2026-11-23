@@ -23,8 +23,8 @@
 
 ## Milestone 2: loader and first console
 
-- Decide 16K vs 4K pages. 16K keeps ios-sweet's bootstrap math; 4K matches
-  the existing Exynos port and needs new table code.
+- Keep 16K pages for the first boot (proven bootstrap math in ios-sweet);
+  validate the granule on Exynos. A 4K switch is a later, separate change.
 - Write a B2L loader for the XNU 8796 `boot_args` ABI (the old UEFI loader is
   12377-only). It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
   `/cpus`, `/arm-io`, the panic-log region and the GICv2 node.

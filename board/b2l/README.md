@@ -12,7 +12,8 @@ board paths without renaming the machine config.
 `patches/0082-b2l-board-and-gicv2.patch` is applied after `xnu/patches/`:
 
 - `SWEET.h`: `B2L_BOARD` constants (GICv2 bases, timer PPI 27, 26 MHz,
-  0xCA000000 framebuffer), no `HAS_GIC_V3`, no 16K-page-specific timer path.
+  0xCA000000 framebuffer), no `HAS_GIC_V3`, and 16K pages retained so the
+  proven ios-sweet bootstrap-table code stays unchanged.
 - `board_config.h`: three CPU clusters (A55/A75/M4) for B2L.
 - `pexpert/arm/pe_fiq.c`: GICv2 distributor and CPU-interface setup, Group 1
   so the timer and SGIs arrive as IRQs.
@@ -23,9 +24,10 @@ board paths without renaming the machine config.
 
 ## Known gaps in this first slice
 
-- 16K pages are still selected through the SWEET machine config. Exynos
-  hardware supports the granule, but this must be validated; a 4K switch
-  needs the matching bootstrap-table changes in `start.s`/`arm_vm_init.c`.
+- 16K pages are retained from the SWEET machine config. The Exynos cores
+  advertise the granule, but it must be confirmed on device before the
+  bootstrap tables are trusted. A later 4K switch needs matching
+  `start.s`/`arm_vm_init.c` changes.
 - The early framebuffer assumes the firmware leaves a 1440x3040 BGRA surface
   at `0xCA000000`. Confirm against the live beyond2lte GOP before booting.
 - Qualcomm-only sweet drivers (UFS, GENI touch, SPMI keys, RPMh, USB) still
