@@ -18,15 +18,19 @@
 - [x] Timer PPI 27, 26 MHz counter, three-cluster CPU topology.
 - [x] Early framebuffer moved to the beyond2lte reservation.
 - [x] Apple device-tree contract generator with self-checks.
-- [ ] CI build green on macOS 14 with `B2L_BOARD=1`.
-- [ ] Guard Qualcomm-only sweet drivers behind `!B2L_BOARD`.
+- [x] CI build green (`macos-15-intel`, Xcode 16.4) with `B2L_BOARD=1`.
+  Artifact `b2l-kernel` contains a linked arm64 `kernel.development.sweet`.
+- [x] Guard Qualcomm-only sweet drivers behind `!B2L_BOARD`.
+- [x] B2L platform-expert and CPU personalities matching the generated ADT
+  (`D22AP`, `samsung,exynos9820`) instead of sweet's Qualcomm names.
 
 ## Milestone 2: loader and first console
 
 - Keep 16K pages for the first boot (proven bootstrap math in ios-sweet);
   validate the granule on Exynos. A 4K switch is a later, separate change.
-- Write a B2L loader for the XNU 8796 `boot_args` ABI (the old UEFI loader is
-  12377-only). It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
+- Write a B2L loader for the XNU 8796 `boot_args` ABI. The beyond2lte XNU
+  12377 loader is a reference, but its `boot_args` is 1152 bytes with a
+  1024-byte command line; 8796 is 736 bytes with a 608-byte command line. It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
   `/cpus`, `/arm-io`, the panic-log region and the GICv2 node.
 - Package through Samsung S-Boot (BOOT partition) and recover the kernel
   console over the persistent log or debug UART.

@@ -9,7 +9,9 @@ board paths without renaming the machine config.
 
 ## Patch series
 
-`patches/0082-b2l-board-and-gicv2.patch` is applied after `xnu/patches/`:
+The board series is applied after `xnu/patches/`:
+
+`patches/0082-b2l-board-and-gicv2.patch`:
 
 - `SWEET.h`: `B2L_BOARD` constants (GICv2 bases, timer PPI 27, 26 MHz,
   0xCA000000 framebuffer), no `HAS_GIC_V3`, and 16K pages retained so the
@@ -22,6 +24,18 @@ board paths without renaming the machine config.
 - `start.s`, `sweet_early.c`, `arm_vm_init.c`: 0xCA000000 / 1440x3040 early
   framebuffer instead of sweet's 0x9c000000 / 1080x2400.
 
+`patches/0083-xcode16-iig-iorpc-kernelcontent.patch`:
+
+- Adds the `kernelContent` member to `IORPC` under `KERNEL`, matching what
+  Xcode 16's `iig` emits. The GitHub runners have no Xcode 15.
+
+`patches/0084-b2l-platform-personalities.patch`:
+
+- `KernelConfigTables.cpp`: B2L matches `SweetPlatformExpert` on `D22AP` and
+  `SweetCPU` on `samsung,exynos9820`, the strings in the generated ADT.
+- `IOKitBSDInit.cpp`: `ufsroot0` stays a sweet-only boot argument, so a B2L
+  boot cannot enter the Qualcomm UFS/GENI/RPMh/USB probe path.
+
 ## Known gaps in this first slice
 
 - 16K pages are retained from the SWEET machine config. The Exynos cores
@@ -30,11 +44,15 @@ board paths without renaming the machine config.
   `start.s`/`arm_vm_init.c` changes.
 - The early framebuffer assumes the firmware leaves a 1440x3040 BGRA surface
   at `0xCA000000`. Confirm against the live beyond2lte GOP before booting.
-- Qualcomm-only sweet drivers (UFS, GENI touch, SPMI keys, RPMh, USB) still
-  probe their addresses unless individually disabled. Do **not** boot this
-  kernel on the phone until they are guarded by `B2L_BOARD`.
+- Qualcomm-only sweet drivers compile in, but their entry point
+  (`sweet_ufs_rootdev`) is no longer reachable under `B2L_BOARD`. The
+  IOResources services that do start (KeyStore, Watchdog, Surface, HID
+  personalities) stay in RAM and only touch hardware behind boot arguments.
 - The Apple device-tree generator (`tools/b2l/mkadt.py`) is a contract, not
   yet consumed by a loader.
+- Still no loader: the existing beyond2lte UEFI loader writes the 12377
+  `boot_args` layout (1152 bytes, 1024-byte command line). XNU 8796 expects
+  736 bytes and a 608-byte command line, so the loader must be rebuilt.
 
 ## Hardware contract
 
