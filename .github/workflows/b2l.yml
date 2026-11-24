@@ -202,10 +202,14 @@ jobs:
           git -C uefi fetch -q origin "$B2L_UEFI_SHA" || true
           git -C uefi checkout -q --detach "$B2L_UEFI_SHA"
           cp -R uefi/mu-silicium-overlay/. mu/
+          if [[ -d uefi/silicium-acpi-overlay ]]; then
+            cp -R uefi/silicium-acpi-overlay/. mu/Silicium-ACPI/
+          fi
           test -f mu/Platforms/Samsung/beyond2ltePkg/beyond2lte.dsc && echo "have platform dsc"
           test -f mu/Resources/DTBs/beyond2lte.dtb && echo "have dtb"
           test -f mu/BootShim/BootShim.S && echo "have BootShim source"
           test -f mu/Silicon/Samsung/S5E9820Pkg/Library/PlatformUfsLib/PlatformUfsLib.inf && echo "have PlatformUfsLib"
+          test -d mu/Silicium-ACPI/SoCs/Samsung && echo "have ACPI SoCs"
 
       - name: Build EDK2 BaseTools
         run: |
