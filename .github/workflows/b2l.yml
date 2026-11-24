@@ -22,6 +22,7 @@ on:
     branches: [main]
     paths:
       - "board/b2l/**"
+      - "boot/**"
       - "xnu/patches/**"
       - "tools/b2l/**"
       - ".github/workflows/b2l.yml"
@@ -49,10 +50,24 @@ jobs:
           mkdir -p out
           python3 tools/b2l/mkadt.py out/b2l.adt
           python3 tools/b2l/mkadt.py out/b2l.adt --dump > out/b2l-adt.txt
+      - name: Check the XNU 8796 boot_args ABI
+        run: |
+          printf '#include "boot/loader/boot_args_8796.h"\nint main(void) { return 0; }\n' > abi.c
+          cc -std=c11 -Wall -Wextra -Werror -I. abi.c -o abi
+          ./abi
+          rm -f abi abi.c
+      - name: Build and verify a BOOT payload trailer
+        run: |
+          python3 tools/b2l/mkb2lpayload.py --self-test
+          python3 -c "import struct; open('out/macho', 'wb').write(struct.pack('<IIII', 0xfeedfacf, 0x0100000c, 0, 2) + bytes(8192))"
+          python3 tools/b2l/mkb2lpayload.py --kernel out/macho --adt out/b2l.adt out/b2l-payload.bin
+          python3 tools/b2l/mkb2lpayload.py --check out/b2l-payload.bin
       - uses: actions/upload-artifact@v4
         with:
           name: b2l-adt
-          path: out/b2l.adt
+          path: |
+            out/b2l.adt
+            out/b2l-payload.bin
           if-no-files-found: error
 
   kernel:
