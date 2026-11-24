@@ -137,11 +137,21 @@ index 6928957..2419259 100644
  #define EARLY_SCALE 2u
  #define EARLY_CELL_W (8u * EARLY_SCALE)
  #define EARLY_CELL_H (16u * EARLY_SCALE)
-diff --git a/pexpert/arm/b2l_gicv2.h b/pexpert/arm/b2l_gicv2.h
+diff --git a/pexpert/pexpert/arm/Makefile b/pexpert/pexpert/arm/Makefile
+--- a/pexpert/pexpert/arm/Makefile
++++ b/pexpert/pexpert/arm/Makefile
+@@ -11,5 +11,6 @@
+ PRIVATE_KERNELFILES = \
+ 	AIC.h \
++	b2l_gicv2.h \
+ 	board_config.h \
+ 	boot.h \
+ 	consistent_debug.h \
+diff --git a/pexpert/pexpert/arm/b2l_gicv2.h b/pexpert/pexpert/arm/b2l_gicv2.h
 new file mode 100644
 index 0000000..b07c877
 --- /dev/null
-+++ b/pexpert/arm/b2l_gicv2.h
++++ b/pexpert/pexpert/arm/b2l_gicv2.h
 @@ -0,0 +1,21 @@
 +/* SPDX-License-Identifier: BSD-2-Clause
 + * Exynos 9820 (beyond2lte) GICv2 CPU-interface access used by sleh_irq().
