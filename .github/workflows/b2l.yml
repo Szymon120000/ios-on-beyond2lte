@@ -62,6 +62,7 @@ jobs:
           python3 -c "import struct; open('out/macho', 'wb').write(struct.pack('<IIII', 0xfeedfacf, 0x0100000c, 0, 2) + bytes(8192))"
           python3 tools/b2l/mkb2lpayload.py --kernel out/macho --adt out/b2l.adt out/b2l-payload.bin
           python3 tools/b2l/mkb2lpayload.py --check out/b2l-payload.bin
+          python3 tools/b2l/package-boot.py --self-test
       - uses: actions/upload-artifact@v4
         with:
           name: b2l-adt

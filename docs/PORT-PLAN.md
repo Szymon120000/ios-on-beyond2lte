@@ -30,7 +30,15 @@
   validate the granule on Exynos. A 4K switch is a later, separate change.
 - Write a B2L loader for the XNU 8796 `boot_args` ABI. The beyond2lte XNU
   12377 loader is a reference, but its `boot_args` is 1152 bytes with a
-  1024-byte command line; 8796 is 736 bytes with a 608-byte command line. It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
+  1024-byte command line; 8796 is 736 bytes with a 608-byte command line.
+- [x] Pin the 8796 `boot_args` offsets and size in `boot/loader/`, checked by
+  the board-contract job.
+- [x] Define and validate a versioned `B2LXNU03` BOOT payload carrying the
+  kernel, Apple device tree and random seed.
+- [x] Define the Android BOOT v1 packaging (BootShim + UEFI FD + DTB +
+  trailer) with structural self-tests.
+- [ ] Implement the UEFI loader against that payload; rebuild the firmware FD
+  with it embedded. It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
   `/cpus`, `/arm-io`, the panic-log region and the GICv2 node.
 - Package through Samsung S-Boot (BOOT partition) and recover the kernel
   console over the persistent log or debug UART.

@@ -46,6 +46,17 @@ Version 3 carries the ADT in the image instead of rebuilding it in the loader.
 `mkadt.py` stays the single source of truth, and the loader only has to copy
 the blob and publish its virtual address in `boot_args.deviceTreeP`.
 
+`tools/b2l/package-boot.py` wraps that payload in an Android BOOT v1 image:
+
+```
+Android kernel area = BootShim + 4 MiB UEFI FD + reference DTB
+trailer             = B2LXNU03 payload
+```
+
+The trailer starts at `PAGE + align(kernel_size)`, matching the existing
+firmware convention. Both tools have `--check`/`--verify` and a self-test that
+runs in the board-contract CI job.
+
 ## Loader responsibilities
 
 1. Find the Android BOOT partition and parse the v1 header and trailer.
