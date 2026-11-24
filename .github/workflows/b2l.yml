@@ -187,6 +187,11 @@ jobs:
           git -C mu submodule update --init --jobs 4 \
             Mu_Basecore Common/Mu Common/Mu_OEM_Sample Silicium-ACPI \
             Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl
+          # BaseTools itself needs these nested Mu_Basecore submodules.
+          git -C mu/Mu_Basecore submodule update --init --jobs 4 \
+            BaseTools/Source/C/BrotliCompress/brotli \
+            MdeModulePkg/Library/BrotliCustomDecompressLib/brotli \
+            MdePkg/Library/BaseFdtLib/libfdt
           if [[ ! -d mu/Silicium-ACPI/SoCs ]]; then
             rm -rf mu/Silicium-ACPI
             git clone -q https://github.com/Project-Silicium/Silicium-ACPI.git mu/Silicium-ACPI
