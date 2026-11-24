@@ -181,7 +181,12 @@ jobs:
         run: |
           git clone -q "$MU_SILICIUM_REPO" mu
           git -C mu checkout -q --detach "$MU_SILICIUM_SHA"
-          git -C mu submodule update --init --recursive
+          # Only the top-level submodules used by the Samsung build.  The
+          # recursive openssl test/language submodules are unnecessary and one
+          # of them has failed to clone on the macOS runner.
+          git -C mu submodule update --init --jobs 4 \
+            Mu_Basecore Common/Mu Common/Mu_OEM_Sample Silicium-ACPI \
+            Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl
           if [[ ! -d mu/Silicium-ACPI/SoCs ]]; then
             rm -rf mu/Silicium-ACPI
             git clone -q https://github.com/Project-Silicium/Silicium-ACPI.git mu/Silicium-ACPI
