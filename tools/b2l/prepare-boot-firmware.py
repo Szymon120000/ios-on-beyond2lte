@@ -34,7 +34,7 @@ def xnu_memory_profile(source):
     if not any(x in source for x in expected):raise ValueError("unrecognized firmware memory profile")
     lines=[l for l in source.splitlines(True) if not any(x in l for x in expected)]
     source=''.join(lines)
-    evidence=Path(__file__).resolve().parents[1]/"common/memory/beyond2lte-8g-dt.json"
+    evidence=Path(__file__).resolve().with_name("data")/"beyond2lte-8g-dt.json"
     nodes=json.loads(evidence.read_text());entries=[]
     # Exact fixed reservations, except the existing separately named U-H row.
     for name,p in nodes.items():
