@@ -70,6 +70,33 @@ runs in the board-contract CI job.
 5. `ExitBootServices` with a fresh map key, cache maintenance, then branch to
    the Mach-O entry with `x0` = physical `boot_args`.
 
+## Implemented core
+
+`boot/loader/b2l_boot_core.c` holds the decisions that can be tested without
+firmware. It does no EFI calls, no allocation and keeps no global state:
+
+- `b2l_parse_macho()` — adapted from beyond2lte-ios, accepts only a linked
+  plain arm64 `MH_EXECUTE` with page-aligned, non-overlapping segments, an
+  executable entry and an identity-mapped header. Rejects dynamic-linker
+  dependencies and nonzero rebase/import state.
+- `b2l_parse_payload()` — validates the `B2LXNU03` header, the page-aligned
+  ADT offset, exact payload length and the 256-byte seed location.
+- `b2l_fill_boot_args()` — checks the arena, ADT and `boot_args` ranges,
+  derives the physical entry and fills the 736-byte record:
+  `Revision`/`Version` 2, `virtBase`, `physBase`, `memSize`,
+  `topOfKernelData` (page-aligned after the record), the framebuffer,
+  `deviceTreeP` as a kernel virtual address, the 608-byte command line and
+  `memSizeActual`.
+
+`boot/loader/test_boot_core.c` builds a synthetic Mach-O and payload,
+checks the accepted cases and every rejection, and runs in the
+board-contract CI job. It has no dependency on the macOS kernel build.
+
+The remaining UEFI application work is mechanical but hardware-facing:
+GOP video, EFI arena allocation outside firmware/EL2/framebuffer
+reservations, copying the segments, `ExitBootServices` with a fresh map key,
+cache maintenance and the handoff branch.
+
 ## Acceptance for this milestone
 
 - Loader and payload build in CI.

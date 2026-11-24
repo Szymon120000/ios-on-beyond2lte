@@ -37,8 +37,10 @@
   kernel, Apple device tree and random seed.
 - [x] Define the Android BOOT v1 packaging (BootShim + UEFI FD + DTB +
   trailer) with structural self-tests.
-- [ ] Implement the UEFI loader against that payload; rebuild the firmware FD
-  with it embedded. It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
+- [x] Implement and host-test the loader core (Mach-O and trailer parsers,
+  arena checks, 736-byte `boot_args` fill) in `boot/loader/`.
+- [ ] Wrap the core in the UEFI application (GOP, EFI arena,
+  `ExitBootServices`, handoff); rebuild the firmware FD with it embedded. It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
   `/cpus`, `/arm-io`, the panic-log region and the GICv2 node.
 - Package through Samsung S-Boot (BOOT partition) and recover the kernel
   console over the persistent log or debug UART.

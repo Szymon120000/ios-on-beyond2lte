@@ -63,6 +63,12 @@ jobs:
           python3 tools/b2l/mkb2lpayload.py --kernel out/macho --adt out/b2l.adt out/b2l-payload.bin
           python3 tools/b2l/mkb2lpayload.py --check out/b2l-payload.bin
           python3 tools/b2l/package-boot.py --self-test
+      - name: Build and run the loader core self-test
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -Iboot/loader \
+            boot/loader/b2l_boot_core.c boot/loader/test_boot_core.c \
+            -o out/boot-core-test
+          out/boot-core-test
       - uses: actions/upload-artifact@v4
         with:
           name: b2l-adt
