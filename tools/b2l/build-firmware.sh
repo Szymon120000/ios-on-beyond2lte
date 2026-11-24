@@ -3,9 +3,11 @@
 # the 4 MiB FD.  The platform overlay and patch script stay external inputs.
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 : "${WORKSPACE:?Set WORKSPACE to a prepared Mu-Silicium tree}"
 : "${LOADER:?Set LOADER to the built XnuLoader.efi}"
-: "${B2L_PREPARE:?Set B2L_PREPARE to beyond2lte-ios scripts/prepare-boot-firmware.py}"
+: "${B2L_PREPARE:=$repo_root/tools/b2l/prepare-boot-firmware.py}"
 : "${CLANG_BIN:?Set CLANG_BIN to a directory with clang and lld-link}"
 : "${PYTHON_COMMAND:=python3}"
 : "${BUILD_JOBS:=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"

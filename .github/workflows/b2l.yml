@@ -38,8 +38,6 @@ env:
   MU_SILICIUM_SHA: 2147dec93fc293ec85b1814a828816130d6f93b7
   B2L_UEFI_REPO: https://github.com/orhunnx/beyond2lte-uefi.git
   B2L_UEFI_SHA: c7846ec9257c322eca6eae4cac7d1801786c95f5
-  B2L_REF_REPO: https://github.com/Szymon120000/beyond2lte-ios.git
-  B2L_REF_SHA: 2c6110f
 
 jobs:
   contract:
@@ -209,20 +207,10 @@ jobs:
           WORKSPACE: ${{ github.workspace }}/mu
         run: tools/b2l/build-loader.sh
 
-      - name: Fetch the external firmware patch script
-        run: |
-          git init -q ref
-          git -C ref remote add origin "$B2L_REF_REPO"
-          git -C ref fetch -q --depth 1 origin "$B2L_REF_SHA"
-          git -C ref checkout -q FETCH_HEAD
-          test -f ref/scripts/prepare-boot-firmware.py
-          test -f ref/common/memory/beyond2lte-8g-dt.json
-
       - name: Embed the loader and build the 4 MiB FD
         env:
           WORKSPACE: ${{ github.workspace }}/mu
           LOADER: ${{ github.workspace }}/mu/Build/B2LXnu/RELEASE_CLANGPDB/AARCH64/XnuLoader.efi
-          B2L_PREPARE: ${{ github.workspace }}/ref/scripts/prepare-boot-firmware.py
         run: tools/b2l/build-firmware.sh
 
       - name: Package and verify boot.img

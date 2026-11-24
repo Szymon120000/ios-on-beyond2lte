@@ -92,14 +92,37 @@ firmware. It does no EFI calls, no allocation and keeps no global state:
 checks the accepted cases and every rejection, and runs in the
 board-contract CI job. It has no dependency on the macOS kernel build.
 
-The remaining UEFI application work is mechanical but hardware-facing:
-GOP video, EFI arena allocation outside firmware/EL2/framebuffer
-reservations, copying the segments, `ExitBootServices` with a fresh map key,
-cache maintenance and the handoff branch.
+## UEFI application
+
+`boot/uefi/XnuLoader/` is a standalone UEFI application built against the
+Mu-Silicium workspace; it is not part of the external platform package.
+
+- `BootPayload.c` locates the Android BOOT GPT partition through
+  `BlockIo`/`PartitionInfo`, validates the v1 header, reads the `B2LXNU03`
+  payload into pool memory and hands it to `b2l_parse_payload()`.
+- `XnuLoader.c` checks `CurrentEL`, the Mach-O and the arena, requires a
+  `PixelBlueGreenRedReserved8BitPerColor` GOP mode of at least 1184x864,
+  allocates the fixed `0x900000000`/`0xFD800000` arena as owned
+  `EfiLoaderData`, copies the segments and the ADT, and fills `boot_args`.
+- Before `ExitBootServices` it verifies that the arena, the loaded image and
+  the current stack are identity mapped, then retries with a fresh memory map
+  key. The retry path is the only place that calls back into boot services.
+- `XnuHandoff.S` cleans the image to PoC, invalidates instructions to PoU,
+  disables the MMU, D-cache and I-cache and branches to the physical entry
+  with `x0` = physical `boot_args`. No secondary CPU is started; `SweetCPU`
+  does that with PSCI.
+- Failures paint the first 16 top-left framebuffer cells red; the progress
+  markers are blue, cyan, green, yellow and green again. A red marker is a
+  definite loader rejection, not a kernel fault.
+
+`tools/b2l/build-loader.sh` builds the app. `tools/b2l/build-firmware.sh`
+runs the external `prepare-boot-firmware.py`, embeds the app as
+`B2LXnuEmbedded`, and builds the 4 MiB FD. The CI `boot` job performs this in
+a fresh Mu-Silicium tree, then packages and verifies `boot.img`.
 
 ## Acceptance for this milestone
 
-- Loader and payload build in CI.
+- Loader, firmware FD and `boot.img` build in CI from pinned external trees.
 - On device: the early `B2L` framebuffer markers appear, followed by the first
   timer tick. No boot claim before a recovered console line.
 
