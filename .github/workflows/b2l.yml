@@ -191,7 +191,8 @@ jobs:
           git -C mu/Mu_Basecore submodule update --init --jobs 4 \
             BaseTools/Source/C/BrotliCompress/brotli \
             MdeModulePkg/Library/BrotliCustomDecompressLib/brotli \
-            MdePkg/Library/BaseFdtLib/libfdt
+            MdePkg/Library/BaseFdtLib/libfdt \
+            MdePkg/Library/MipiSysTLib/mipisyst
           if [[ ! -d mu/Silicium-ACPI/SoCs ]]; then
             rm -rf mu/Silicium-ACPI
             git clone -q https://github.com/Project-Silicium/Silicium-ACPI.git mu/Silicium-ACPI
