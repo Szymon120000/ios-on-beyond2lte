@@ -196,10 +196,10 @@ jobs:
           git -C uefi fetch -q origin "$B2L_UEFI_SHA" || true
           git -C uefi checkout -q --detach "$B2L_UEFI_SHA"
           cp -R uefi/mu-silicium-overlay/. mu/
-          test -f mu/Platforms/Samsung/beyond2ltePkg/beyond2lte.dsc
-          test -f mu/Resources/DTBs/beyond2lte.dtb
-          test -f mu/BootShim/BootShim.bin
-          test -f mu/Silicon/Samsung/S5E9820Pkg/Library/PlatformUfsLib/PlatformUfsLib.inf
+          test -f mu/Platforms/Samsung/beyond2ltePkg/beyond2lte.dsc && echo "have platform dsc"
+          test -f mu/Resources/DTBs/beyond2lte.dtb && echo "have dtb"
+          test -f mu/BootShim/BootShim.S && echo "have BootShim source"
+          test -f mu/Silicon/Samsung/S5E9820Pkg/Library/PlatformUfsLib/PlatformUfsLib.inf && echo "have PlatformUfsLib"
 
       - name: Build EDK2 BaseTools
         run: |
@@ -218,6 +218,14 @@ jobs:
           LOADER: ${{ github.workspace }}/mu/Build/B2LXnu/RELEASE_CLANGPDB/AARCH64/XnuLoader.efi
         run: tools/b2l/build-firmware.sh
 
+      - name: Build BootShim
+        run: |
+          "${CLANG_BIN}clang" --target=aarch64-linux-gnu -c mu/BootShim/BootShim.S \
+            -o out/BootShim.elf -DREQUIRES_KERNEL_HEADER=1 \
+            -DFD_BASE=0xC9000000 -DFD_SIZE=0x400000
+          "${CLANG_BIN}llvm-objcopy" -O binary out/BootShim.elf out/BootShim.bin
+          test "$(wc -c < out/BootShim.bin)" -eq 112
+
       - name: Package and verify boot.img
         run: |
           KERNEL="out/b2l-kernel/kernel.development.sweet"
@@ -228,7 +236,7 @@ jobs:
           test -f "$FD"
           python3 tools/b2l/mkb2lpayload.py --kernel "$KERNEL" --adt "$ADT" out/b2l-payload.bin
           python3 tools/b2l/package-boot.py \
-            --shim mu/BootShim/BootShim.bin \
+            --shim out/BootShim.bin \
             --firmware "$FD" \
             --dtb mu/Resources/DTBs/beyond2lte.dtb \
             --payload out/b2l-payload.bin \
