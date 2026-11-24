@@ -12,9 +12,7 @@
 #include "b2l_boot_core.h"
 
 #define U64_MAX_VALUE ((uint64_t)~0ULL)
-#define PAYLOAD_MAGIC "B2LXNU03"
 #define PAYLOAD_VERSION 3u
-#define PAYLOAD_HEADER_SIZE 304u
 #define PAYLOAD_SEED_OFFSET 48u
 
 static uint32_t
@@ -34,6 +32,18 @@ static int
 within(uint64_t off, uint64_t size, uint64_t length)
 {
 	return off <= length && size <= length - off;
+}
+
+/* Freestanding helpers: EDK2 links no C library, and a plain loop can be
+ * recognised by the compiler as memset/memcpy. */
+static void
+zero_bytes(void *destination, size_t length)
+{
+	volatile uint8_t *d = destination;
+
+	while (length--) {
+		*d++ = 0;
+	}
 }
 
 static int
@@ -183,16 +193,16 @@ b2l_parse_payload(const void *data, size_t length, struct b2l_payload *out)
 	const uint8_t *p = data;
 	uint64_t kernel_offset, kernel_size, adt_offset, adt_size;
 
-	if (!p || !out || length < PAYLOAD_HEADER_SIZE || !magic_is(p, PAYLOAD_MAGIC) ||
+	if (!p || !out || length < B2L_PAYLOAD_HEADER_SIZE || !magic_is(p, B2L_PAYLOAD_MAGIC) ||
 	    read32(p + 8) != PAYLOAD_VERSION ||
-	    read32(p + 12) != PAYLOAD_HEADER_SIZE) {
+	    read32(p + 12) != B2L_PAYLOAD_HEADER_SIZE) {
 		return -1;
 	}
 	kernel_size = read64(p + 16);
 	adt_size = read64(p + 24);
 	kernel_offset = read64(p + 32);
 	adt_offset = read64(p + 40);
-	if (kernel_offset != PAYLOAD_HEADER_SIZE || kernel_size < 4096 ||
+	if (kernel_offset != B2L_PAYLOAD_HEADER_SIZE || kernel_size < 4096 ||
 	    adt_size < 8) {
 		return -2;
 	}
@@ -262,19 +272,24 @@ b2l_fill_boot_args(const struct b2l_macho *macho,
 		return -6;
 	}
 
-	*args = (struct b2l_boot_args_8796){ 0 };
+	zero_bytes(args, sizeof(*args));
 	args->Revision = 2;
 	args->Version = 2;
 	args->virtBase = macho->virtual_base;
 	args->physBase = phys_base;
 	args->memSize = arena_size;
 	args->topOfKernelData = top_of_kernel_data;
-	args->Video = *video;
+	args->Video.v_baseAddr = video->v_baseAddr;
+	args->Video.v_display = video->v_display;
+	args->Video.v_rowBytes = video->v_rowBytes;
+	args->Video.v_width = video->v_width;
+	args->Video.v_height = video->v_height;
+	args->Video.v_depth = video->v_depth;
 	args->machineType = 0;
 	args->deviceTreeP = macho->virtual_base + (dt_phys - phys_base);
 	args->deviceTreeLength = dt_length;
 	for (i = 0; i < sizeof(args->CommandLine) - 1 && command_line[i]; i++) {
-		args->CommandLine[i] = command_line[i];
+		((volatile char *)args->CommandLine)[i] = command_line[i];
 	}
 	args->bootFlags = 0;
 	args->memSizeActual = arena_size;

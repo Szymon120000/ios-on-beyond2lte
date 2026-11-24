@@ -1,0 +1,41 @@
+## @file
+# B2L XNU 8796 loader for beyond2lte.
+# SPDX-License-Identifier: BSD-2-Clause
+##
+[Defines]
+  INF_VERSION    = 0x0001001B
+  BASE_NAME      = XnuLoader
+  FILE_GUID      = 92742D9E-1A4F-42F8-9DC9-53895297B2F4
+  MODULE_TYPE    = UEFI_APPLICATION
+  VERSION_STRING = 0.2
+  ENTRY_POINT    = UefiMain
+
+[Sources]
+  XnuLoader.c
+  BootPayload.c
+  BootPayload.h
+  XnuHandoff.S
+  boot_core.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ArmPkg/ArmPkg.dec
+
+[LibraryClasses]
+  ArmLib
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+
+[Protocols]
+  gEfiBlockIoProtocolGuid
+  gEfiDiskIoProtocolGuid
+  gEfiPartitionInfoProtocolGuid
+  gEfiLoadedImageProtocolGuid
+  gEfiGraphicsOutputProtocolGuid
+
+[BuildOptions]
+  *_*_*_CC_FLAGS = -DB2L_UEFI_BUILD

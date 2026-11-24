@@ -18,6 +18,9 @@
 #include "boot_args_8796.h"
 
 #define B2L_MAX_SEGMENTS 32
+#define B2L_PAYLOAD_MAGIC "B2LXNU03"
+#define B2L_PAYLOAD_HEADER_SIZE 304
+#define B2L_PAYLOAD_SEED_SIZE 256
 
 struct b2l_segment {
 	uint64_t va;

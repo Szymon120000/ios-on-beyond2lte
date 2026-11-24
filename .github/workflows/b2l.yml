@@ -34,6 +34,12 @@ env:
   KERNEL_CONFIG: ${{ inputs.kernel_config || 'DEVELOPMENT' }}
   MACHINE_CONFIG: ${{ inputs.machine_config || 'SWEET' }}
   B2L_BOARD: ${{ inputs.b2l_board || '1' }}
+  MU_SILICIUM_REPO: https://github.com/Project-Silicium/Mu-Silicium.git
+  MU_SILICIUM_SHA: 2147dec93fc293ec85b1814a828816130d6f93b7
+  B2L_UEFI_REPO: https://github.com/orhunnx/beyond2lte-uefi.git
+  B2L_UEFI_SHA: c7846ec9257c322eca6eae4cac7d1801786c95f5
+  B2L_REF_REPO: https://github.com/Szymon120000/beyond2lte-ios.git
+  B2L_REF_SHA: 2c6110f
 
 jobs:
   contract:
@@ -140,3 +146,108 @@ jobs:
           name: b2l-kernel
           path: out/
           if-no-files-found: warn
+
+  boot:
+    name: Build firmware FD and a test boot.img
+    needs: [contract, kernel]
+    runs-on: macos-15-intel
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: b2l-kernel
+          path: out/b2l-kernel
+      - uses: actions/download-artifact@v4
+        with:
+          name: b2l-adt
+          path: out/b2l-adt
+
+      - name: Toolchain
+        run: |
+          for f in llvm lld nasm acpica; do
+            brew install "$f" || brew install "$f"
+          done
+          brew link --overwrite --force llvm lld >/dev/null 2>&1 || true
+          LLVM_PREFIX="$(brew --prefix llvm)"
+          LLD_PREFIX="$(brew --prefix lld)"
+          mkdir -p out/llvm-bin
+          ln -sf "$LLVM_PREFIX/bin/"* out/llvm-bin/
+          ln -sf "$LLD_PREFIX/bin/lld-link" out/llvm-bin/lld-link
+          ln -sf "$LLD_PREFIX/bin/ld.lld" out/llvm-bin/ld.lld
+          echo "CLANG_BIN=$GITHUB_WORKSPACE/out/llvm-bin/" >> "$GITHUB_ENV"
+          echo "BUILD_JOBS=$(sysctl -n hw.ncpu)" >> "$GITHUB_ENV"
+
+      - name: Fetch Mu-Silicium and the beyond2lte platform overlay
+        run: |
+          git clone -q "$MU_SILICIUM_REPO" mu
+          git -C mu checkout -q --detach "$MU_SILICIUM_SHA"
+          git -C mu submodule update --init --recursive
+          if [[ ! -d mu/Silicium-ACPI/SoCs ]]; then
+            rm -rf mu/Silicium-ACPI
+            git clone -q https://github.com/Project-Silicium/Silicium-ACPI.git mu/Silicium-ACPI
+            git -C mu/Silicium-ACPI checkout -q 94896d455b758765f9cef0dc60e1bc447f53bee5
+          fi
+          git clone -q "$B2L_UEFI_REPO" uefi
+          git -C uefi fetch -q origin "$B2L_UEFI_SHA" || true
+          git -C uefi checkout -q --detach "$B2L_UEFI_SHA"
+          cp -R uefi/mu-silicium-overlay/. mu/
+          test -f mu/Platforms/Samsung/beyond2ltePkg/beyond2lte.dsc
+          test -f mu/Resources/DTBs/beyond2lte.dtb
+          test -f mu/BootShim/BootShim.bin
+          test -f mu/Silicon/Samsung/S5E9820Pkg/Library/PlatformUfsLib/PlatformUfsLib.inf
+
+      - name: Build EDK2 BaseTools
+        run: |
+          make -C mu/Mu_Basecore/BaseTools/Source/C -j"$BUILD_JOBS" \
+            EXTRA_OPTFLAGS="-Wno-unused-but-set-variable"
+          test -x mu/Mu_Basecore/BaseTools/Source/C/bin/GenFw
+
+      - name: Build the B2L loader
+        env:
+          WORKSPACE: ${{ github.workspace }}/mu
+        run: tools/b2l/build-loader.sh
+
+      - name: Fetch the external firmware patch script
+        run: |
+          git init -q ref
+          git -C ref remote add origin "$B2L_REF_REPO"
+          git -C ref fetch -q --depth 1 origin "$B2L_REF_SHA"
+          git -C ref checkout -q FETCH_HEAD
+          test -f ref/scripts/prepare-boot-firmware.py
+          test -f ref/common/memory/beyond2lte-8g-dt.json
+
+      - name: Embed the loader and build the 4 MiB FD
+        env:
+          WORKSPACE: ${{ github.workspace }}/mu
+          LOADER: ${{ github.workspace }}/mu/Build/B2LXnu/RELEASE_CLANGPDB/AARCH64/XnuLoader.efi
+          B2L_PREPARE: ${{ github.workspace }}/ref/scripts/prepare-boot-firmware.py
+        run: tools/b2l/build-firmware.sh
+
+      - name: Package and verify boot.img
+        run: |
+          KERNEL="out/b2l-kernel/kernel.development.sweet"
+          ADT="out/b2l-adt/b2l.adt"
+          FD="mu/Build/beyond2ltePkg/RELEASE_CLANGPDB/FV/SILICIUM_UEFI.fd"
+          test -f "$KERNEL"
+          test -f "$ADT"
+          test -f "$FD"
+          python3 tools/b2l/mkb2lpayload.py --kernel "$KERNEL" --adt "$ADT" out/b2l-payload.bin
+          python3 tools/b2l/package-boot.py \
+            --shim mu/BootShim/BootShim.bin \
+            --firmware "$FD" \
+            --dtb mu/Resources/DTBs/beyond2lte.dtb \
+            --payload out/b2l-payload.bin \
+            out/b2l-boot.img
+          python3 tools/b2l/package-boot.py --verify out/b2l-boot.img
+          shasum -a 256 out/b2l-boot.img > out/b2l-boot.img.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b2l-boot-img
+          path: |
+            out/b2l-boot.img
+            out/b2l-boot.img.sha256
+            out/b2l-payload.bin
+          if-no-files-found: error
