@@ -50,9 +50,10 @@ The board series is applied after `xnu/patches/`:
   personalities) stay in RAM and only touch hardware behind boot arguments.
 - The Apple device-tree generator (`tools/b2l/mkadt.py`) is a contract, not
   yet consumed by a loader.
-- Still no loader: the existing beyond2lte UEFI loader writes the 12377
-  `boot_args` layout (1152 bytes, 1024-byte command line). XNU 8796 expects
-  736 bytes and a 608-byte command line, so the loader must be rebuilt.
+- The new loader writes the 8796 `boot_args` layout and is built by CI, but
+  it has not run on the phone. The older beyond2lte XNU 12377 image is known
+  to reach SpringBoard with charging; that is a different kernel tree and
+  does not validate the 8796 loader.
 
 ## Hardware contract
 

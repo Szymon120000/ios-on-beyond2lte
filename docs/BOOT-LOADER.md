@@ -123,6 +123,7 @@ a fresh Mu-Silicium tree, then packages and verifies `boot.img`.
 ## Acceptance for this milestone
 
 - Loader, firmware FD and `boot.img` build in CI from pinned external trees.
+- `docs/DEVICE-TEST.md` defines the flashing and evidence procedure.
 - On device: the early `B2L` framebuffer markers appear, followed by the first
   timer tick. No boot claim before a recovered console line.
 

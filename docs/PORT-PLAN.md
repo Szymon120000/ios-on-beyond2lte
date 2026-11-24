@@ -39,12 +39,22 @@
   trailer) with structural self-tests.
 - [x] Implement and host-test the loader core (Mach-O and trailer parsers,
   arena checks, 736-byte `boot_args` fill) in `boot/loader/`.
-- [ ] Wrap the core in the UEFI application (GOP, EFI arena,
-  `ExitBootServices`, handoff); rebuild the firmware FD with it embedded. It must publish `/chosen`, `/chosen/memory-map`, `/defaults`,
-  `/cpus`, `/arm-io`, the panic-log region and the GICv2 node.
+- [x] Wrap the core in the UEFI application (GOP, fixed EFI arena,
+  `ExitBootServices`, cache maintenance, handoff). The application builds
+  against the external Mu-Silicium tree and is embedded in the 4 MiB
+  firmware FD.
+- [x] CI `boot` job: fresh Mu-Silicium + platform overlay, EDK2 BaseTools,
+  loader, embedded firmware FD, BootShim and a verified Android BOOT v1
+  `boot.img` artifact.
+- The loader consumes the `B2LXNU03` ADT, which already publishes `/chosen`,
+  `/chosen/memory-map`, `/defaults`, `/cpus`, `/arm-io`, the panic-log region
+  and the GICv2 node.
 - Package through Samsung S-Boot (BOOT partition) and recover the kernel
   console over the persistent log or debug UART.
 - Acceptance: first `B2L` line and timer ticks on device.
+- Status: no 8796 on-device evidence yet. The separate beyond2lte-ios XNU
+  12377 image has been observed booting to SpringBoard with working charging
+  on this phone; that proves the hardware/boot chain, not this kernel tree.
 
 ## Milestone 3: storage and userspace
 
