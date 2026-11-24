@@ -12,6 +12,12 @@ The CI `boot` job uploads:
 - `out/b2l-boot.img.sha256`
 - `out/b2l-payload.bin`
 
+The latest green CI artifact (run `45477190609`, commit `d6dddf6`) is
+21,274,344 bytes with sha256
+`d0e2c222b60fcf3cbf67b905ceede021242c48740b3e96fc69d2593eb79f015a`.
+The `boot` job prints this hash, and `package-boot.py --verify` re-parses the
+image; check both before flashing.
+
 Write the image to the **BOOT** partition only. Never flash the bootloader,
 the PIT, or USERDATA for this test.
 

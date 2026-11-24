@@ -46,6 +46,11 @@
 - [x] CI `boot` job: fresh Mu-Silicium + platform overlay, EDK2 BaseTools,
   loader, embedded firmware FD, BootShim and a verified Android BOOT v1
   `boot.img` artifact.
+  - Run `45477190609` (commit `d6dddf6`) is green. Artifact `b2l-boot-img`
+    (id 14961034231): 21,274,344 bytes, sha256
+    `d0e2c222b60fcf3cbf67b905ceede021242c48740b3e96fc69d2593eb79f015a`.
+    Kernel 16,687,320 B, ADT 9,960 B, payload 16,701,160 B; BootShim 112 B
+    and a 4 MiB FD with the loader embedded in the LZMA `FVMAIN`.
 - The loader consumes the `B2LXNU03` ADT, which already publishes `/chosen`,
   `/chosen/memory-map`, `/defaults`, `/cpus`, `/arm-io`, the panic-log region
   and the GICv2 node.

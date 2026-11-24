@@ -1,5 +1,35 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## B2L port handoff: beyond2lte (Galaxy S10+, Exynos 9820) - active
+
+**Goal:** port this XNU 8796 / iOS 16 tree to `beyond2lte` (`Szymon120000/ios-on-beyond2lte`).
+The notes below this section are the inherited sweet notes; they describe the
+Redmi Note 10 Pro port and do not apply to the Exynos device.
+
+**State (2026-11-24, evening):**
+- CI run `45477190609` (commit `d6dddf6`) is fully green: contract, XNU 8796
+  kernel, and the `Build firmware FD and a test boot.img` job.
+- Verified kernel artifact: `kernel.development.sweet`, arm64 Mach-O, ~16 MB
+  (`kernel_bytes` 16,687,320).
+- Verified `boot.img` artifact (`b2l-boot-img`, artifact 14961034231):
+  Android BOOT v1, 21,274,344 bytes, sha256
+  `d0e2c222b60fcf3cbf67b905ceede021242c48740b3e96fc69d2593eb79f015a`.
+  Layout: BootShim (112 B) + 4 MiB UEFI FD (loader embedded, LZMA FVMAIN)
+  + DTB, then the `B2LXNU03` payload trailer (`adt_bytes` 9,960).
+- **No 8796 on-device evidence yet.** The separate beyond2lte-ios XNU 12377
+  image boots to SpringBoard with charging, but that proves the hardware/boot
+  chain only, not this kernel tree.
+
+**Next concrete action:** flash `b2l-boot.img` to the **BOOT** partition only
+(`docs/DEVICE-TEST.md`) after explicit user confirmation, then capture the
+loader markers / UART and only claim boot once a `B2L` console line or timer
+tick is recovered. Do not flash BL/PIT/USERDATA for this test.
+
+**Unfinished / known gaps:** UFS host driver (Exynos, not Qualcomm GENI);
+touch is the Qualcomm GT9896 path in `sweet` and needs a new SE7 I2C driver;
+16K-page bootstrap unvalidated on Exynos 9820; UI performance work waits until
+the 8796 image is confirmed.
+
 ## Agent handoff / active work (2026-10-15, latest)
 
 ### >>> UPDATE 2026-10-18 (read first, then the 10-17 handoff below) <<<

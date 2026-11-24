@@ -48,9 +48,11 @@ The board series is applied after `xnu/patches/`:
   (`sweet_ufs_rootdev`) is no longer reachable under `B2L_BOARD`. The
   IOResources services that do start (KeyStore, Watchdog, Surface, HID
   personalities) stay in RAM and only touch hardware behind boot arguments.
-- The Apple device-tree generator (`tools/b2l/mkadt.py`) is a contract, not
-  yet consumed by a loader.
-- The new loader writes the 8796 `boot_args` layout and is built by CI, but
+- The Apple device-tree generator (`tools/b2l/mkadt.py`) feeds the payload
+  trailer; `docs/BOOT-LOADER.md` documents the loader contract.
+- The new loader writes the 8796 `boot_args` layout and is built by CI into a
+  verified `boot.img` (run `45477190609`, sha256
+  `d0e2c222b60fcf3cbf67b905ceede021242c48740b3e96fc69d2593eb79f015a`), but
   it has not run on the phone. The older beyond2lte XNU 12377 image is known
   to reach SpringBoard with charging; that is a different kernel tree and
   does not validate the 8796 loader.
